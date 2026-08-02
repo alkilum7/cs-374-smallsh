@@ -13,7 +13,7 @@ static int bgps[1024];
 
 void set_interrupt_handler() {
     signal(SIGINT, SIG_IGN);
-
+    // WIP: Add SIGTSTP toggle
 }
 
 void exit_shell() {
@@ -33,7 +33,7 @@ void cd_command(int argc, char *argv[]) {
 }
 
 void print_status() {
-    printf("exit status %d", status);
+    printf("exit status %d\n", status);
     return;
 }
 
@@ -107,7 +107,9 @@ void run_line(char *user_line) {
             exit(1);
         } else {
             if(!background) {
-                waitpid(run_pid, &status, 0);
+                int command_status = 0;
+                waitpid(run_pid, &command_status, 0);
+                status = WEXITSTATUS(command_status);
             }
         }
     }
