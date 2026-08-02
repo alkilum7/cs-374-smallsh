@@ -86,6 +86,7 @@ void run_line(char *user_line) {
                 if(input_file == -1) {
                     printf("cannot open %s for input\n", input_filename);
                     fflush(stdout);
+                    exit(1);
                 } else {
                     dup2(input_file, STDIN_FILENO);
                 }
@@ -96,6 +97,7 @@ void run_line(char *user_line) {
                 if(output_file == -1) {
                     printf("Could not create %s", output_filename);
                     fflush(stdout);
+                    exit(1);
                 } else {
                     dup2(output_file, STDOUT_FILENO);
                 }
@@ -118,9 +120,8 @@ void run_line(char *user_line) {
 int main(int argc, char *argv[]) {
     set_interrupt_handler();
     status = 0;
-    int no_loop = 0;
 
-    while(no_loop < 100) {
+    while(1) {
         char user_line[2048];
         
         // Get line
@@ -130,6 +131,5 @@ int main(int argc, char *argv[]) {
 
         // Process line
         run_line(user_line);
-        no_loop++;
     }
 }
