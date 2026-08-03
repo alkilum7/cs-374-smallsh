@@ -34,9 +34,47 @@ void set_interrupt_handler() {
     sigaction(SIGTSTP, &tstp_sigaction, NULL);
 }
 
+void add_bgp(int pid) {
+    for(int i = 0; i < 1024; i++) {
+        if(bgps[i] < 0) {
+            bgps[i] = pid;
+            return;
+        }
+    }
+}
+
+void check_bgps() {
+    for(int i = 0; i < 1024; i++) {
+        if(bgps[i] > 0) {
+            // Check process
+            int wstatus;
+            int state = waitpid(bgps[i], &wstatus, WNOHANG);
+            if(state != 0) {
+                if(WIFEXITED(wstatus)) {
+                    exit_or_term = 0;
+                    status = WEXITSTATUS(wstatus);
+                } else {
+                    exit_or_term = 1;
+                    status = WTERMSIG(wstatus);
+                    printf("terminated by signal %d\n", status);
+                }
+                bgps[i] = -1;
+            }
+        }
+    }
+}
+
+void kill_bgps() {
+    for(int i = 0; i < 1024; i++) {
+        if(bgps[i] > 0) {
+            kill(bgps[i], SIGTERM);
+        }
+    }
+}
+
 void exit_shell() {
     exit(0);
-    // WIP: kill children
+    kill_bgps();
 }
 
 void cd_command(int argc, char *argv[]) {
@@ -102,6 +140,12 @@ void run_line(char *user_line) {
         if(foreground_mode) background = 0;
         int run_pid = fork();
         if(run_pid == 0) {
+            // Set signal behavior
+            signal(SIGTSTP, SIG_IGN);
+            if(!background) {
+                signal(SIGINT, SIG_DFL);
+            }
+            
             // Set input and output redirection
             if(has_input) {
                 int input_file = open(input_filename, O_RDONLY);
@@ -132,6 +176,7 @@ void run_line(char *user_line) {
         } else {
             if(background) {
                 printf("background pid is %d\n", run_pid);
+                add_bgp(run_pid);
             } else {
                 int command_status = 0;
                 waitpid(run_pid, &command_status, 0);
@@ -156,6 +201,7 @@ int main(int argc, char *argv[]) {
     while(1) {
         char user_line[2048];
         
+        check_bgps();
         // Get line
         do {
             printf(": ");
