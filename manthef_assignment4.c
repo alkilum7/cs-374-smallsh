@@ -9,11 +9,29 @@
 #include <string.h>
 
 static int status;
+static int exit_or_term;
 static int bgps[1024];
+static int foreground_mode;
+
+void toggle_foreground(int errno) {
+    if(foreground_mode) {
+        foreground_mode = 0;
+        write(STDOUT_FILENO, "\nExiting foreground-only mode\n", 30);
+        fflush(stdout);
+    } else {
+        foreground_mode = 1;
+        write(STDOUT_FILENO, 
+            "\nEntering foreground-only mode (& is now ignored)\n", 50);
+        fflush(stdout);
+    }
+}
 
 void set_interrupt_handler() {
     signal(SIGINT, SIG_IGN);
-    // WIP: Add SIGTSTP toggle
+    struct sigaction tstp_sigaction;
+    tstp_sigaction.sa_handler = toggle_foreground;
+    sigfillset(&tstp_sigaction.sa_mask);
+    sigaction(SIGTSTP, &tstp_sigaction, NULL);
 }
 
 void exit_shell() {
@@ -33,8 +51,11 @@ void cd_command(int argc, char *argv[]) {
 }
 
 void print_status() {
-    printf("exit status %d\n", status);
-    return;
+    if(exit_or_term == 0) {
+        printf("exit status %d\n", status);
+    } else if(exit_or_term == 1) {
+        printf("terminated by signal %d\n", status);
+    }
 }
 
 void run_line(char *user_line) {
@@ -78,6 +99,7 @@ void run_line(char *user_line) {
         print_status();
     } else {
         // Run arbitrary command
+        if(foreground_mode) background = 0;
         int run_pid = fork();
         if(run_pid == 0) {
             // Set input and output redirection
@@ -108,10 +130,13 @@ void run_line(char *user_line) {
             printf("%s: no such file or directory\n", argv[0]);
             exit(1);
         } else {
-            if(!background) {
+            if(background) {
+                printf("background pid is %d\n", run_pid);
+            } else {
                 int command_status = 0;
                 waitpid(run_pid, &command_status, 0);
                 status = WEXITSTATUS(command_status);
+                exit_or_term = 0;
             }
         }
     }
@@ -120,14 +145,22 @@ void run_line(char *user_line) {
 int main(int argc, char *argv[]) {
     set_interrupt_handler();
     status = 0;
+    exit_or_term = 0;
+    foreground_mode = 0;
+
+    // Prepare bgps vector
+    for(int i = 0; i < 1024; i++) {
+        bgps[i] = -1;
+    }
 
     while(1) {
         char user_line[2048];
         
         // Get line
-        printf(": ");
-        fflush(stdout);
-        fgets(user_line, 2048, stdin);
+        do {
+            printf(": ");
+            fflush(stdout);
+        } while(!fgets(user_line, 2048, stdin));
 
         // Process line
         run_line(user_line);
