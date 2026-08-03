@@ -53,10 +53,17 @@ void check_bgps() {
                 if(WIFEXITED(wstatus)) {
                     exit_or_term = 0;
                     status = WEXITSTATUS(wstatus);
+                    printf(
+                        "background pid %d is done: exit value %d",
+                        bgps[i], wstatus
+                    );
                 } else {
                     exit_or_term = 1;
                     status = WTERMSIG(wstatus);
-                    printf("terminated by signal %d\n", status);
+                    printf(
+                        "background pid %d is done: terminated by signal %d",
+                        bgps[i], wstatus
+                    );
                 }
                 bgps[i] = -1;
             }
